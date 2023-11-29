@@ -24,6 +24,7 @@ class Radars(Dataset):
         upper    = np.load(self.list[index][1]).astype(np.float32)
         satelite = np.load(self.list[index][2]).astype(np.float32)
         
+        satelite = np.ones((10, 240, 240), dtype=np.float32)
         #satelite = torch.from_numpy(satelite)
 
 
