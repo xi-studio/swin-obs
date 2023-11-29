@@ -20,20 +20,20 @@ class Radars(Dataset):
         self.transform = transform
 
     def __getitem__(self, index):
-        surface  = np.load(self.list[index][0])
-        upper    = np.load(self.list[index][1])
-        satelite = np.load(self.list[index][2])
+        surface  = np.load(self.list[index][0]).astype(np.float32)
+        upper    = np.load(self.list[index][1]).astype(np.float32)
+        satelite = np.load(self.list[index][2]).astype(np.float32)
+        
+        #satelite = torch.from_numpy(satelite)
 
-        upper = upper.reshape((65, 241, 281))
 
-
-        print(surface.shape, upper.shape)
+        #upper = upper.reshape((65, 241, 281))
 
        
-        era5 = torch.cat((surface, upper), axis=0)
-        print(era5.shape, satelite.shape)
+        #era5 = np.concatenate((surface, upper),axis=0)
+        #print(era5.shape, satelite.shape)
 
-        return satelite, era5
+        return satelite[:, :240, :240], satelite[:, :240, :240]#era5
 
     def __len__(self):
         return len(self.list)
@@ -77,7 +77,7 @@ class UNetModel(nn.Module):
         self.up1 = up(1024, 256)
         self.up2 = up(512, 128)
         self.up3 = up(256, 64)
-        self.out = nn.Conv2d(128, 1, kernel_size=1)
+        self.out = nn.Conv2d(128, self.n_channels, kernel_size=1)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -131,12 +131,12 @@ def training_function(config):
             accelerator.backward(loss)
             optimizer.step()
 
-            if (i + 1) % 100 == 0:
+            if (i + 1) % 1 == 0:
                 print(f"{accelerator.device} Train... [epoch {epoch + 1}/{epoch_num}, step {i + 1}/{len(train_loader)}]\t[loss {loss.item()}]")
        
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 3, "seed": 42, "batch_size": 64, "in_channels": 1, "mul_channels":64}
+    config = {"lr": 4e-5, "num_epochs": 3, "seed": 42, "batch_size": 8, "in_channels": 10, "mul_channels":64}
     config['filenames'] = 'data/meta/obs_meta.npy'
     training_function(config)
 
