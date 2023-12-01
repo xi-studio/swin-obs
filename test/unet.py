@@ -116,22 +116,18 @@ def training_function(config):
     for epoch in range(epoch_num):
         model.train()
        
-        pbar = tqdm(train_loader) 
-        #with tqdm(total=len(train_loader)) as pbar:
-        for i, (x_train, y_train) in enumerate(train_loader):
-           out = model(x_train)
-           loss = criterion(out, x_train)
+        with tqdm(total=len(train_loader)) as pbar:
+            for i, (x_train, y_train) in enumerate(train_loader):
+               out = model(x_train)
+               loss = criterion(out, x_train)
 
-           optimizer.zero_grad()
-           accelerator.backward(loss)
-           optimizer.step()
+               optimizer.zero_grad()
+               accelerator.backward(loss)
+               optimizer.step()
 
-           #pbar.set_postfix({'loss': '{0:1.5f}'.format(loss)})
-           pbar.desc = "train epoch[{}/{}] loss:{:.3f}".format(epoch + 1, epoch_num, loss)
+               pbar.set_description("train epoch[{}/{}] loss:{:.3f}".format(epoch + 1, epoch_num, loss))
+               pbar.update(1)
     
-          #if (i + 1) % 1 == 0:
-            #    print(f"{accelerator.device} Train... [epoch {epoch + 1}/{epoch_num}, step {i + 1}/{len(train_loader)}]\t[loss {loss.item()}]")
-       
 
 def main(): 
     config = {"lr": 4e-5, "num_epochs": 3, "seed": 42, "batch_size": 8, "in_channels": 10, "mul_channels":64}
