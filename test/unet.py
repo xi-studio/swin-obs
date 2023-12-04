@@ -96,7 +96,6 @@ def training_function(config):
     #filenames     = np.load(config['filenames'])
     filenames     = np.arange(1000)
     
-
     train_tfm = Compose([ToTensor()])
     dataset = Radars(filenames, transform=train_tfm) 
     n_val = int(len(dataset) * 0.1)
@@ -104,7 +103,6 @@ def training_function(config):
     train_ds, val_ds = random_split(dataset, [n_train, n_val])
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
-
 
     model = UNetModel(config)
     criterion = nn.L1Loss()

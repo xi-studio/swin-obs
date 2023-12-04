@@ -24,9 +24,10 @@ class Radars(Dataset):
 
         satelite    = np.load(self.list[index][0]).astype(np.float32)
         pg_surface  = np.load(self.list[index][1]).astype(np.float32)
-        pg_upper    = np.load(self.list[index][2]).astype(np.float32)
         era_surface = np.load(self.list[index][3]).astype(np.float32)
-        era_upper   = np.load(self.list[index][4]).astype(np.float32)
+
+        satelite = np.nan_to_num(satelite, nan=255)
+        satelite = (satlelite - 180.0) / (375.0 - 180.0)
         
 
         pg_upper  = pg_upper.reshape((65, 241, 281))
