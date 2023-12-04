@@ -27,16 +27,18 @@ class Radars(Dataset):
         era_surface = np.load(self.list[index][3]).astype(np.float32)
 
         satelite = np.nan_to_num(satelite, nan=255)
-        satelite = (satlelite - 180.0) / (375.0 - 180.0)
+        satelite = (satelite - 180.0) / (375.0 - 180.0)
+
+        pg_tem = (pg_surface[0] - 220) / (315 - 220)
+        era_tem = (era_surface[0] - 220) / (315 - 220)
         
 
-        pg_upper  = pg_upper.reshape((65, 241, 281))
-        era_upper = era_upper.reshape((65, 241, 281))
+        pg_tem = pg_tem.reshape((1, 241, 281))
+        era_tem = era_tem.reshape((1, 241, 281))
        
-        pg_input   = np.concatenate((satelite, pg_surface, pg_upper),axis=0)
-        era_output = np.concatenate((era_surface, era_upper),axis=0)
+        pg_input  = np.concatenate((satelite, pg_tem),axis=0)
 
-        return pg_input, era_output 
+        return pg_input, era_tem 
 
     def __len__(self):
         return len(self.list)
@@ -143,7 +145,7 @@ def training_function(config):
                pbar.update(1)
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 3, "seed": 42, "batch_size": 1, "in_channels": 79, "mul_channels":128}
+    config = {"lr": 4e-5, "num_epochs": 100, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":128}
     config['filenames'] = 'data/meta/era5_meta.npy'
     training_function(config)
 
