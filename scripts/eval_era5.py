@@ -8,6 +8,8 @@ res.sort()
 
 file_list = []
 
+num = 0
+sum_L1_loss = 0
 for x in res[:-24]:
     print(x)
     name = x.split("_")[-1]
@@ -30,5 +32,13 @@ for x in res[:-24]:
     #print(pg_tem)
     #print(era_tem)
     mse = np.mean((pg_tem - era_tem)**2)
-    print(mse)
+    L1 = np.mean(np.abs(pg_tem - era_tem))
+    L2 = np.mean(np.abs(pg_tem - era_tem)**2)
+    
+    sum_L1_loss += L1
+    num += 1
+    print(mse, L2, L1)
+
+print("ALL:", sum_L1_loss/num)
+
 

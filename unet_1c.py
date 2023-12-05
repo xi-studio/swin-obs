@@ -3,6 +3,7 @@ import argparse
 import os
 import re
 from tqdm import tqdm
+from skimage.transform import rescale, resize
 
 import numpy as np
 import PIL
@@ -14,27 +15,29 @@ from accelerate import Accelerator
 from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
 class Radars(Dataset):
-    def __init__(self, filenames, transform=None):
+    def __init__(self, filenames):
         super(Radars, self).__init__()
 
         self.list = filenames 
-        self.transform = transform
 
     def __getitem__(self, index):
 
         satelite    = np.load(self.list[index][0]).astype(np.float32)
-        pg_surface  = np.load(self.list[index][1]).astype(np.float32)
-        era_surface = np.load(self.list[index][3]).astype(np.float32)
+        pg  = np.load(self.list[index][1])
+        pg_surface = (pg['surf'][0,0]).astype(np.float32)
+        era_surface = np.load(self.list[index][2]).astype(np.float32)
 
         satelite = np.nan_to_num(satelite, nan=255)
         satelite = (satelite - 180.0) / (375.0 - 180.0)
 
         pg_tem = (pg_surface[0] - 220) / (315 - 220)
         era_tem = (era_surface[0] - 220) / (315 - 220)
-        
 
-        pg_tem = pg_tem.reshape((1, 241, 281))
-        era_tem = era_tem.reshape((1, 241, 281))
+        satelite = resize(satelite, (10, 256, 256))
+        era_tem = resize(era_tem, (256, 256))
+        
+        pg_tem = pg_tem.reshape((1, 256, 256))
+        era_tem = era_tem.reshape((1, 256, 256))
        
         pg_input  = np.concatenate((satelite, pg_tem),axis=0)
 
@@ -85,7 +88,6 @@ class UNetModel(nn.Module):
         self.out = nn.Conv2d(128, self.n_channels - 10, kernel_size=1)
 
     def forward(self, x):
-        x  = nn.functional.interpolate(x, size=(256, 256), mode='bilinear', align_corners=True)
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -101,7 +103,6 @@ class UNetModel(nn.Module):
         x = self.up3(x)
         x = torch.cat([x, x1], dim=1)
         x = self.out(x)
-        x = nn.functional.interpolate(x, size=(241, 281), mode='bilinear', align_corners=True)
 
         return x 
 
@@ -112,8 +113,7 @@ def training_function(config):
     learning_rate = config['lr']
     filenames     = np.load(config['filenames'])
     
-    train_tfm = Compose([ToTensor()])
-    dataset = Radars(filenames, transform=train_tfm) 
+    dataset = Radars(filenames) 
     n_val = int(len(dataset) * 0.1)
     n_train = len(dataset) - n_val
     train_ds, val_ds = random_split(dataset, [n_train, n_val])
@@ -128,25 +128,44 @@ def training_function(config):
     accelerator = Accelerator()
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
-       
+
+    best_acc = 1
     for epoch in range(epoch_num):
         model.train()
        
         with tqdm(total=len(train_loader)) as pbar:
-            for i, (x_train, y_train) in enumerate(train_loader):
-               out = model(x_train)
-               loss = criterion(out, y_train)
+            for i, (x, y) in enumerate(train_loader):
+               out = model(x)
+               loss = criterion(out, y)
 
                optimizer.zero_grad()
                accelerator.backward(loss)
                optimizer.step()
 
-               pbar.set_description("train epoch[{}/{}] loss:{:.3f}".format(epoch + 1, epoch_num, loss))
+               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
                pbar.update(1)
 
+        model.eval()
+        accurate = 0
+        num_elems = 0
+        for _, (x, y) in enumerate(val_loader):
+            with torch.no_grad():
+                out = model(x)
+                loss = criterion(out, y)
+                num_elems += 1
+                accurate += loss 
+    
+        eval_metric = accurate / num_elems
+        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
+        if eval_metric < best_acc:
+            best_acc = eval_metric
+            output_dir = f"./logs/epoch_{epoch}"
+            accelerator.save_state(output_dir)
+
+
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 100, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":128}
-    config['filenames'] = 'data/meta/era5_meta.npy'
+    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":64}
+    config['filenames'] = 'data/meta/pred_01_meta.npy'
     training_function(config)
 
 if __name__ == '__main__':
