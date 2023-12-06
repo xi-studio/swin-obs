@@ -155,7 +155,7 @@ def training_function(config):
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":64}
+    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 11, "mul_channels":64}
     #config['filenames'] = 'data/meta/eval_01_meta.npy'
     config['filenames'] = 'data/meta/pred_01_meta.npy'
     training_function(config)
