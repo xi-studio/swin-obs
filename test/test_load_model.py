@@ -39,9 +39,9 @@ class Radars(Dataset):
         pg_tem = pg_tem.reshape((1, 256, 256))
         era_tem = era_tem.reshape((1, 256, 256))
        
-        #pg_input  = np.concatenate((satelite, pg_tem),axis=0)
+        pg_input  = np.concatenate((satelite, pg_tem),axis=0)
 
-        return pg_tem, era_tem 
+        return pg_input, era_tem 
 
     def __len__(self):
         return len(self.list)
@@ -85,7 +85,7 @@ class UNetModel(nn.Module):
         self.up1 = up(1024, 256)
         self.up2 = up(512, 128)
         self.up3 = up(256, 64)
-        self.out = nn.Conv2d(128, self.n_channels, kernel_size=1)
+        self.out = nn.Conv2d(128, self.n_channels - 10, kernel_size=1)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -114,57 +114,50 @@ def training_function(config):
     filenames     = np.load(config['filenames'])
     
     dataset = Radars(filenames) 
-    n_val = int(len(dataset) * 0.1)
-    n_train = len(dataset) - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
+    #n_val = int(len(dataset) * 0.1)
+    #n_train = len(dataset) - n_val
+    #train_ds, val_ds = random_split(dataset, [n_train, n_val])
+    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    #val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
 
 
     model = UNetModel(config)
-    criterion = nn.L1Loss()
+    #criterion = nn.L1Loss()
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     accelerator = Accelerator()
-    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
+    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
+    u_model = accelerator.unwrap_model(model)
+    path_to_checkpoint = os.path.join("logs/epoch_491","pytorch_model.bin")
+    u_model.load_state_dict(torch.load(path_to_checkpoint))
 
-
-    best_acc = 1
     for epoch in range(epoch_num):
-        model.train()
-       
-        with tqdm(total=len(train_loader)) as pbar:
-            for i, (x, y) in enumerate(train_loader):
-               out = model(x)
-               loss = criterion(out, y)
-
-               optimizer.zero_grad()
-               accelerator.backward(loss)
-               optimizer.step()
-
-               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
-               pbar.update(1)
-
-        model.eval()
+        u_model.eval()
         accurate = 0
+        base = 0
         num_elems = 0
-        for _, (x, y) in enumerate(val_loader):
+        for _, (x, y) in enumerate(test_loader):
             with torch.no_grad():
-                out = model(x)
+                out = u_model(x)
                 loss = criterion(out, y)
+                out1 = x[:,10].unsqueeze(1)
+                loss1 = criterion(out1, y)
                 num_elems += 1
                 accurate += loss 
+                base += loss1
+                print('loss', loss)
+                print('loss1',loss1)
     
         eval_metric = accurate / num_elems
+        base_metric = base / num_elems
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
-        if eval_metric < best_acc:
-            best_acc = eval_metric
-            output_dir = f"./logs_1/epoch_{epoch}"
-            #accelerator.save_state(output_dir)
+        accelerator.print(f"epoch {epoch}: {base_metric:.5f}")
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 1, "mul_channels":64}
+    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 11, "mul_channels":64}
+    #config['filenames'] = 'data/meta/eval_01_meta.npy'
     config['filenames'] = 'data/meta/pred_01_meta.npy'
     training_function(config)
 
