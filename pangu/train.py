@@ -29,10 +29,10 @@ class Radars(Dataset):
         sate = np.nan_to_num(sate, nan=255)
         sate = (sate - 180.0) / (375.0 - 180.0)
 
-        pg_tem = (pg_surface[0] - 220) / (315 - 220)
-        era_tem = (era_surface[0] - 220) / (315 - 220)
+        pg_tem = (pred[0] - 220) / (315 - 220)
+        era_tem = (obs[0] - 220) / (315 - 220)
 
-        satelite = resize(satelite, (10, 256, 256))
+        satelite = resize(sate, (10, 256, 256))
         era_tem = resize(era_tem, (256, 256))
         
         pg_tem = pg_tem.reshape((1, 256, 256))
@@ -163,8 +163,8 @@ def training_function(config):
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":64}
-    config['filenames'] = 'data/meta/pred_01_meta.npy'
+    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":128}
+    config['filenames'] = 'data/meta/train_01.npy'
     training_function(config)
 
 if __name__ == '__main__':
