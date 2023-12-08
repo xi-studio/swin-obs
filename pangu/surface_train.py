@@ -113,49 +113,58 @@ def training_function(config):
     filenames     = np.load(config['filenames'])
     
     dataset = Radars(filenames) 
-    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=8)
+    n_val = int(len(dataset) * 0.1)
+    n_train = len(dataset) - n_val
+    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
 
 
     model = UNetModel(config)
-    #criterion = nn.L1Loss()
-    criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     accelerator = Accelerator()
-    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
+    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
 
-    accelerator.load_state('logs/epoch_379')
+    best_acc = 1
     for epoch in range(epoch_num):
+        model.train()
+       
+        with tqdm(total=len(train_loader)) as pbar:
+            for i, (x, y) in enumerate(train_loader):
+               out = model(x)
+               loss = criterion(out, y)
+
+               optimizer.zero_grad()
+               accelerator.backward(loss)
+               optimizer.step()
+
+               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
+               pbar.update(1)
+
         model.eval()
         accurate = 0
-        base = 0
         num_elems = 0
-        for _, (x, y) in enumerate(test_loader):
+        for _, (x, y) in enumerate(val_loader):
             with torch.no_grad():
                 out = model(x)
                 loss = criterion(out, y)
-                out1 = x[:,10].unsqueeze(1)
-                loss1 = criterion(out1, y)
                 num_elems += 1
                 accurate += loss 
-                base += loss1
-                print('loss:', loss)
-                print('loss_1:',loss1, '\n')
-                #eval_metric = accurate / num_elems
-                #base_metric = base / num_elems
-                #accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
-                #accelerator.print(f"epoch {epoch}: {base_metric:.5f}")
     
         eval_metric = accurate / num_elems
-        base_metric = base / num_elems
-        accelerator.print(f"epoch {epoch}: {eval_metric:}")
-        accelerator.print(f"epoch {epoch}: {base_metric:}")
+        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
+        if eval_metric < best_acc:
+            best_acc = eval_metric
+            output_dir = f"./logs/epoch_{epoch}"
+            accelerator.save_state(output_dir)
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 11, "mul_channels":128}
-    config['filenames'] = 'data/meta/test_01.npy'
+    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":128}
+    config['filenames'] = 'data/meta/train_01.npy'
     training_function(config)
 
 if __name__ == '__main__':
