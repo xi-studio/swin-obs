@@ -1,26 +1,16 @@
-import glob
 import numpy as np
-import time
+import os
+filename = 'data/meta/pangu_meta.npy'
 
-res = glob.glob('../data/obs_2020/*.npy')
-res.sort()
-file_list = []
-
-for x in res[24:-24]:
-    print(x)
-    name = x.split("_")[-1]
-    tname = name.split(".")[0]
-    print(tname)
-   
-    now   = time.mktime(time.strptime(tname, "%Y-%m-%dT%H"))
-    tname_1  = time.strftime("%Y-%m-%dT%H", time.localtime(now - 3600))
-    tname_6  = time.strftime("%Y-%m-%dT%H", time.localtime(now - 3600 * 6))
-    tname_24 = time.strftime("%Y-%m-%dT%H", time.localtime(now - 3600 * 24))
-    
-    filename_1  = '../data/1_output/surface_1_%s.npy' % tname_1
-    filename_6  = '../data/6_output/surface_6_%s.npy' % tname_6
-    filename_24 = '../data/24_output/surface_24_%s.npy' % tname_24
-
-    file_list.append((filename_1, filename_6, filename_24))
-
-np.save('data/meta/pangu_meta.npy', np.array(file_list))
+res = np.load(filename)
+for i, x in enumerate(res):
+    if os.path.isfile(x[0]) == False:
+        print('x[0]:', x[0])
+    if os.path.isfile(x[1]) == False:
+        print('x[1]:', x[1])
+    if os.path.isfile(x[2]) == False:
+        print('x[2]:', x[2])
+    print(i)
+    np.load(x[0])
+    np.load(x[1])
+    np.load(x[2])
