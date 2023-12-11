@@ -21,6 +21,6 @@ for x in res[24:-24]:
     filename_6  = '../data/6_output/surface_6_%s.npy' % tname_6
     filename_24 = '../data/24_output/surface_24_%s.npy' % tname_24
 
-    file_list.append((filename_1, filename_6, filename_24))
+    file_list.append((x, filename_1, filename_6, filename_24))
 
 np.save('../data/meta/pangu_meta.npy', np.array(file_list))
