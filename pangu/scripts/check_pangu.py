@@ -1,6 +1,6 @@
 import numpy as np
 import os
-filename = 'data/meta/pangu_meta.npy'
+filename = '../data/meta/pangu_meta.npy'
 
 res = np.load(filename)
 for i, x in enumerate(res):
