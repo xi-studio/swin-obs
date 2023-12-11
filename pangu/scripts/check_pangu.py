@@ -10,13 +10,13 @@ def preprocess(x):
     return x
 
 def check_MAE(x, pred):
-    2m_tem = np.mean(np.abs(pred[0] - x[0]) / x[0])
+    tem = np.mean(np.abs(pred[0] - x[0]) / x[0])
     mslp   = np.mean(np.abs(pred[1] - x[1]) / x[1])
     u = np.mean(np.abs(pred[2] - x[2]) / x[2])
     v = np.mean(np.abs(pred[3] - x[3]) / x[3])
     cat = np.mean(np.abs(pred - x) / x)
 
-    return (2m_tem, mslp, u, v, cat)
+    return (tem, mslp, u, v, cat)
 
 
 def main():
@@ -30,17 +30,17 @@ def main():
     for i, x in enumerate(res):
         print(i)
         obs = preprocess(np.load(x[0]))
-        1_pred  = preprocess(np.load(x[1])[(3,0,1,2), :, :])
-        6_pred  = preprocess(np.load(x[2])[(3,0,1,2), :, :])
-        24_pred = preprocess(np.load(x[3])[(3,0,1,2), :, :])
+        pred_1  = preprocess(np.load(x[1])[(3,0,1,2), :, :])
+        pred_6  = preprocess(np.load(x[2])[(3,0,1,2), :, :])
+        pred_24 = preprocess(np.load(x[3])[(3,0,1,2), :, :])
     
-        1_MAE  = check_MAE(obs, 1_pred) 
-        6_MAE  = check_MAE(obs, 6_pred)
-        24_MAE = check_MAE(obs, 24_pred)
+        MAE_1  = check_MAE(obs, pred_1) 
+        MAE_6  = check_MAE(obs, pred_6)
+        MAE_24 = check_MAE(obs, pred_24)
 
-        list_1.append(1_MAE)
-        list_6.append(6_MAE)
-        list_24.append(24_MAE)
+        list_1.append(MAE_1)
+        list_6.append(MAE_6)
+        list_24.append(MAE_24)
         break
 
     np.save('../data/MAE_loss.npy', np.array((list_1, list_6, list_24)))
