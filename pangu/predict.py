@@ -125,7 +125,7 @@ def training_function(config):
     model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
 
 
-    accelerator.load_state('logs/epoch_379')
+    accelerator.load_state('logs_1207_1c/epoch_379')
     for epoch in range(epoch_num):
         model.eval()
         accurate = 0

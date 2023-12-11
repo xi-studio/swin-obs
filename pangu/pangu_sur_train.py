@@ -14,11 +14,21 @@ import torchvision.datasets as datasets
 from accelerate import Accelerator
 from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
+
 class Radars(Dataset):
     def __init__(self, filenames):
         super(Radars, self).__init__()
 
         self.list = filenames 
+
+    def preprocess(self, x):
+        x[0] = (x[0] - 220.0) / (315.0 - 220.0)
+        x[1] = (x[1]/100.0 - 950.0) / (1050.0 - 950.0)
+        x[2] = (x[2] - (-30.0)) / (30.0 - (-30.0))
+        x[3] = (x[3] - (-30.0)) / (30.0 - (-30.0))
+
+        return x
+
 
     def __getitem__(self, index):
 
@@ -26,21 +36,20 @@ class Radars(Dataset):
         pred = np.load(self.list[index][1]).astype(np.float32)
         obs  = np.load(self.list[index][2]).astype(np.float32)
 
+        pred = pred[(3, 0, 1, 2), :, :]
+
         sate = np.nan_to_num(sate, nan=255)
         sate = (sate - 180.0) / (375.0 - 180.0)
 
-        pg_tem = (pred[0] - 220) / (315 - 220)
-        era_tem = (obs[0] - 220) / (315 - 220)
+        pred = self.preprocess(pred)
+        obs  = self.preprocess(obs)
 
-        satelite = resize(sate, (10, 256, 256))
-        era_tem = resize(era_tem, (256, 256))
+        sate = resize(sate, (10, 256, 256))
+        obs  = resize(obs, (4, 256, 256))
         
-        pg_tem = pg_tem.reshape((1, 256, 256))
-        era_tem = era_tem.reshape((1, 256, 256))
-       
-        pg_input  = np.concatenate((satelite, pg_tem),axis=0)
+        pred_input  = np.concatenate((sate, pred), axis=0)
 
-        return pg_input, era_tem 
+        return pred_input, obs
 
     def __len__(self):
         return len(self.list)
@@ -51,7 +60,7 @@ class UNetModel(nn.Module):
         super(UNetModel, self).__init__()
 
         self.n_channels   = config['in_channels']
-        self.mul_channels = config['mul_channels']
+        self.mul = config['mul_channels']
 
         def double_conv(in_channels, out_channels):
             return nn.Sequential(
@@ -75,16 +84,16 @@ class UNetModel(nn.Module):
                 double_conv(in_channels, out_channels)
             )
 
-        self.inc = double_conv(self.n_channels, 64)
-        self.down1 = down(64, 128)
-        self.down2 = down(128, 256)
-        self.down3 = down(256, 512)
-        self.down4 = down(512, 512)
-        self.up0 = up(512, 512) 
-        self.up1 = up(1024, 256)
-        self.up2 = up(512, 128)
-        self.up3 = up(256, 64)
-        self.out = nn.Conv2d(128, self.n_channels - 10, kernel_size=1)
+        self.inc = double_conv(self.n_channels, self.mul)
+        self.down1 = down(self.mul, self.mul * 2)
+        self.down2 = down(self.mul * 2, self.mul * 4)
+        self.down3 = down(self.mul * 4, self.mul * 8)
+        self.down4 = down(self.mul * 8, self.mul * 8)
+        self.up0 = up(self.mul * 8, self.mul * 8) 
+        self.up1 = up(self.mul * 16, self.mul * 4)
+        self.up2 = up(self.mul * 8, self.mul * 2)
+        self.up3 = up(self.mul * 4, self.mul)
+        self.out = nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -124,10 +133,7 @@ def training_function(config):
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator(log_with="all", project_dir='logs')
-    hps = {"num_iterations": 5, "learning_rate": 1e-2}
-    accelerator.init_trackers("logs", config=hps)
-
+    accelerator = Accelerator()
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
 
@@ -146,7 +152,6 @@ def training_function(config):
 
                pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
                pbar.update(1)
-               accelerator.log({"training_loss": loss}, step=i)
 
         model.eval()
         accurate = 0
@@ -165,12 +170,10 @@ def training_function(config):
             output_dir = f"./logs/epoch_{epoch}"
             accelerator.save_state(output_dir)
 
-    accelerator.end_training()
-
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 11, "mul_channels":128}
-    config['filenames'] = 'data/meta/train_01.npy'
+    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 16, "in_channels": 14, "mul_channels": 128}
+    config['filenames'] = 'data/meta/pangu_01_train.npy'
     training_function(config)
 
 if __name__ == '__main__':
