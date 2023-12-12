@@ -1,7 +1,8 @@
 import numpy as np
 import time
 
-res = np.load('data/meta/era5_meta.npy')
+#res = np.load('../data/meta/era5_meta.npy')
+res = np.load('../data/meta/pangu_meta.npy')
 print(res.shape)
 
 train_list = []
@@ -16,5 +17,5 @@ for x in res:
 print(len(train_list))
 print(len(val_list))
 
-np.save('./data/meta/train_01.npy', np.array(train_list))
-np.save('./data/meta/test_01.npy', np.array(val_list))
+np.save('../data/meta/train_pangu_24.npy', np.array(train_list))
+np.save('../data/meta/test_pangu_24.npy', np.array(val_list))

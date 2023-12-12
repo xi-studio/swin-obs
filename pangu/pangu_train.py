@@ -32,9 +32,11 @@ class Radars(Dataset):
 
     def __getitem__(self, index):
 
-        sate = np.load(self.list[index][0]).astype(np.float32)
-        pred = np.load(self.list[index][1]).astype(np.float32)
-        obs  = np.load(self.list[index][2]).astype(np.float32)
+        sate = np.load(self.list[index][0][1:]).astype(np.float32)
+        pred = np.load(self.list[index][1][1:]).astype(np.float32)
+        obs  = np.load(self.list[index][2][1:]).astype(np.float32)
+
+        pred = pred[(3, 0, 1, 2), :, :]
 
         sate = np.nan_to_num(sate, nan=255)
         sate = (sate - 180.0) / (375.0 - 180.0)
@@ -42,7 +44,10 @@ class Radars(Dataset):
         pred = self.preprocess(pred)
         obs  = self.preprocess(obs)
 
+
+
         sate = resize(sate, (10, 256, 256))
+        pred = resize(pred, (4, 256, 256))
         obs  = resize(obs, (4, 256, 256))
         
         pred_input  = np.concatenate((sate, pred), axis=0)
@@ -131,11 +136,14 @@ def training_function(config):
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator()
+    accelerator = Accelerator(log_with="all", project_dir='logs_pangu')
+    hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
+    accelerator.init_trackers("l212", config=hps)
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
 
     best_acc = 1
+    overall_step = 0
     for epoch in range(epoch_num):
         model.train()
        
@@ -151,6 +159,9 @@ def training_function(config):
                pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
                pbar.update(1)
 
+               overall_step += 1
+               accelerator.log({"training_loss": loss}, step=overall_step)
+
         model.eval()
         accurate = 0
         num_elems = 0
@@ -163,15 +174,17 @@ def training_function(config):
     
         eval_metric = accurate / num_elems
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
+
+        if epoch > 250:
+            accelerator.save_state(f"./logs_pangu/checkpoint/epoch_{epoch}")
         if eval_metric < best_acc:
             best_acc = eval_metric
-            output_dir = f"./logs/epoch_{epoch}"
-            #accelerator.save_state(output_dir)
+            accelerator.save_state("./logs_pangu/checkpoint/best")
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 16, "in_channels": 14, "mul_channels": 128}
-    config['filenames'] = 'data/meta/train_01.npy'
+    config = {"lr": 4e-5, "num_epochs": 300, "seed": 42, "batch_size": 16, "in_channels": 14, "mul_channels": 128}
+    config['filenames'] = 'data/meta/train_pangu_24.npy'
     training_function(config)
 
 if __name__ == '__main__':

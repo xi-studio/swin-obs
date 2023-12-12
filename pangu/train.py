@@ -124,8 +124,8 @@ def training_function(config):
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator(log_with="all", project_dir='logs')
-    hps = {"num_iterations": 5, "learning_rate": 1e-2}
+    accelerator = Accelerator(log_with="all", project_dir='logs_one_c')
+    hps = {"num_iterations": epoch_num, "learning_rate": 4e-5}
     accelerator.init_trackers("logs", config=hps)
 
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
@@ -162,7 +162,7 @@ def training_function(config):
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
         if eval_metric < best_acc:
             best_acc = eval_metric
-            output_dir = f"./logs/epoch_{epoch}"
+            output_dir = f"./logs_one_c/epoch_{epoch}"
             accelerator.save_state(output_dir)
 
     accelerator.end_training()
