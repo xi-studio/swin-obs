@@ -10,10 +10,10 @@ def preprocess(x):
     return x
 
 def check_MAE(x, pred):
-    tem = np.mean(np.abs(pred[0] - x[0]) / x[0])
-    mslp   = np.mean(np.abs(pred[1] - x[1]) / x[1])
-    u = np.mean(np.abs(pred[2] - x[2]) / x[2])
-    v = np.mean(np.abs(pred[3] - x[3]) / x[3])
+    tem = np.mean(np.abs(pred[0] - x[0]))
+    mslp   = np.mean(np.abs(pred[1] - x[1]))
+    u = np.mean(np.abs(pred[2] - x[2]))
+    v = np.mean(np.abs(pred[3] - x[3]))
     cat = np.mean(np.abs(pred - x) / x)
 
     return (tem, mslp, u, v, cat)
