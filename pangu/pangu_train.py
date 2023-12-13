@@ -44,11 +44,12 @@ class Radars(Dataset):
         pred = self.preprocess(pred)
         obs  = self.preprocess(obs)
 
-
-
         sate = resize(sate, (10, 256, 256))
         pred = resize(pred, (4, 256, 256))
         obs  = resize(obs, (4, 256, 256))
+
+        pred[1:] = 0
+        obs[1:] = 0
         
         pred_input  = np.concatenate((sate, pred), axis=0)
 
@@ -138,7 +139,7 @@ def training_function(config):
 
     accelerator = Accelerator(log_with="all", project_dir='logs_pangu')
     hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
-    accelerator.init_trackers("l212", config=hps)
+    accelerator.init_trackers("log_1213", config=hps)
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
 
@@ -176,10 +177,10 @@ def training_function(config):
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
 
         if epoch > 250:
-            accelerator.save_state(f"./logs_pangu/checkpoint/epoch_{epoch}")
+            accelerator.save_state(f"./logs_pangu/checkpoint_1213/epoch_{epoch}")
         if eval_metric < best_acc:
             best_acc = eval_metric
-            accelerator.save_state("./logs_pangu/checkpoint/best")
+            accelerator.save_state("./logs_pangu/checkpoint_1213/best")
 
 
 def main(): 

@@ -136,7 +136,7 @@ def training_function(config):
     model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
 
 
-    accelerator.load_state('logs_pangu/checkpoint/epoch_299')
+    accelerator.load_state('logs_pangu/checkpoint/best')
     for epoch in range(epoch_num):
         model.eval()
         accurate = 0
@@ -147,16 +147,16 @@ def training_function(config):
             with torch.no_grad():
                 out = model(x)
                 #loss = criterion(out, y)
-                loss = criterion(out[0,1], y[0,1])
+                loss = criterion(out[0,0], y[0,0])
 
-                m = out.cpu().numpy()
-                n = y.cpu().numpy()
-                nloss = np.mean(np.abs(m[0,1] - n[0,1]))
-                print('nloss:', nloss)
-                print(m.shape)
+                #m = out.cpu().numpy()
+                #n = y.cpu().numpy()
+                #nloss = np.mean(np.abs(m[0,1] - n[0,1]))
+                #print('nloss:', nloss)
+                #print(m.shape)
                 #loss = criterion(out[0,(0,2,3)], y[0,(0,2,3)])
                 out1 = x[:,-4:]
-                loss1 = criterion(out1[0,1], y[0,1])
+                loss1 = criterion(out1[0,0], y[0,0])
                 #loss1 = criterion(out1, y)
                 #loss1 = criterion(out1[0,(0,2,3)], y[0,(0,2,3)])
                 num_elems += 1
@@ -165,7 +165,6 @@ def training_function(config):
                 print(i)
                 print('loss:', loss)
                 print('loss_1:',loss1, '\n')
-                break
     
         eval_metric = accurate / num_elems
         base_metric = base / num_elems
