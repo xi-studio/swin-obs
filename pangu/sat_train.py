@@ -33,29 +33,17 @@ class Radars(Dataset):
     def __getitem__(self, index):
 
         sate = np.load(self.list[index][0][1:]).astype(np.float32)
-        pred = np.load(self.list[index][1][1:]).astype(np.float32)
         obs  = np.load(self.list[index][2][1:]).astype(np.float32)
-
-        pred = pred[(3, 0, 1, 2), :, :]
 
         sate = np.nan_to_num(sate, nan=255)
         sate = (sate - 180.0) / (375.0 - 180.0)
 
-        pred = self.preprocess(pred)
         obs  = self.preprocess(obs)
 
-        pred[1:] = 0
-        obs[1:] = 0
-
-
-
         sate = resize(sate, (10, 256, 256))
-        pred = resize(pred, (4, 256, 256))
         obs  = resize(obs, (4, 256, 256))
-        
-        pred_input  = np.concatenate((sate, pred), axis=0)
 
-        return pred_input, obs
+        return sate, obs
 
     def __len__(self):
         return len(self.list)
@@ -71,10 +59,10 @@ class UNetModel(nn.Module):
         def double_conv(in_channels, out_channels):
             return nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-                nn.GroupNorm(32, out_channels),
+                nn.GroupNorm(16, out_channels),
                 nn.SiLU(inplace=True),
                 nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-                nn.GroupNorm(32, out_channels),
+                nn.GroupNorm(16, out_channels),
                 nn.SiLU(inplace=True),
             )
 
@@ -99,7 +87,11 @@ class UNetModel(nn.Module):
         self.up1 = up(self.mul * 16, self.mul * 4)
         self.up2 = up(self.mul * 8, self.mul * 2)
         self.up3 = up(self.mul * 4, self.mul)
-        self.out = nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
+        self.out = nn.Sequential(
+                double_conv(self.mul * 2, self.mul * 2),
+                nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
+        )
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -109,12 +101,16 @@ class UNetModel(nn.Module):
         x5 = self.down4(x4)
         
         x = self.up0(x5)
+        x = self.dropout(x)
         x = torch.cat([x, x4], dim=1)
         x = self.up1(x)
+        x = self.dropout(x)
         x = torch.cat([x, x3], dim=1)
         x = self.up2(x)
+        x = self.dropout(x)
         x = torch.cat([x, x2], dim=1)
         x = self.up3(x)
+        x = self.dropout(x)
         x = torch.cat([x, x1], dim=1)
         x = self.out(x)
 
@@ -128,56 +124,66 @@ def training_function(config):
     filenames     = np.load(config['filenames'])
     
     dataset = Radars(filenames) 
-    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=8)
+    n_val = int(len(dataset) * 0.1)
+    n_train = len(dataset) - n_val
+    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
 
 
     model = UNetModel(config)
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator()
-    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
+    accelerator = Accelerator(log_with="all", project_dir='logs_sat')
+    hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
+    accelerator.init_trackers("log_1214", config=hps)
+    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
 
-    accelerator.load_state('logs_pangu/checkpoint_1214/best')
+    best_acc = 1
+    overall_step = 0
     for epoch in range(epoch_num):
+        model.train()
+       
+        with tqdm(total=len(train_loader)) as pbar:
+            for i, (x, y) in enumerate(train_loader):
+               out = model(x)
+               loss = criterion(out, y)
+
+               optimizer.zero_grad()
+               accelerator.backward(loss)
+               optimizer.step()
+
+               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
+               pbar.update(1)
+
+               overall_step += 1
+               accelerator.log({"training_loss": loss}, step=overall_step)
+
         model.eval()
         accurate = 0
-        base = 0
         num_elems = 0
-       
-        for i, (x, y) in enumerate(test_loader):
+        for _, (x, y) in enumerate(val_loader):
             with torch.no_grad():
                 out = model(x)
-                #loss = criterion(out, y)
-                loss = criterion(out[0,0], y[0,0])
-
-                #m = out.cpu().numpy()
-                #n = y.cpu().numpy()
-                #nloss = np.mean(np.abs(m[0,1] - n[0,1]))
-                #print('nloss:', nloss)
-                #print(m.shape)
-                #loss = criterion(out[0,(0,2,3)], y[0,(0,2,3)])
-                out1 = x[:,-4:]
-                loss1 = criterion(out1[0,0], y[0,0])
-                #loss1 = criterion(out1, y)
-                #loss1 = criterion(out1[0,(0,2,3)], y[0,(0,2,3)])
+                loss = criterion(out, y)
                 num_elems += 1
                 accurate += loss 
-                base += loss1
-                print(i)
-                print('loss:', loss)
-                print('loss_1:',loss1, '\n')
     
         eval_metric = accurate / num_elems
-        base_metric = base / num_elems
-        accelerator.print(f"epoch {epoch}: {eval_metric:}")
-        accelerator.print(f"epoch {epoch}: {base_metric:}")
+        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
+
+        if epoch > 250:
+            accelerator.save_state(f"./logs_sat/checkpoint_1214/epoch_{epoch}")
+        if eval_metric < best_acc:
+            best_acc = eval_metric
+            accelerator.save_state("./logs_sat/checkpoint_1214/best")
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 14, "mul_channels": 64}
-    config['filenames'] = 'data/meta/test_pangu_24.npy'
+    config = {"lr": 4e-5, "num_epochs": 300, "seed": 42, "batch_size": 16, "in_channels": 14, "mul_channels": 96}
+    config['filenames'] = 'data/meta/train_pangu_24.npy'
     training_function(config)
 
 if __name__ == '__main__':
