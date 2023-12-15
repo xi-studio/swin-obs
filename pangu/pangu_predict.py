@@ -71,10 +71,10 @@ class UNetModel(nn.Module):
         def double_conv(in_channels, out_channels):
             return nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-                nn.GroupNorm(32, out_channels),
+                nn.GroupNorm(16, out_channels),
                 nn.SiLU(inplace=True),
                 nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-                nn.GroupNorm(32, out_channels),
+                nn.GroupNorm(16, out_channels),
                 nn.SiLU(inplace=True),
             )
 
@@ -99,7 +99,11 @@ class UNetModel(nn.Module):
         self.up1 = up(self.mul * 16, self.mul * 4)
         self.up2 = up(self.mul * 8, self.mul * 2)
         self.up3 = up(self.mul * 4, self.mul)
-        self.out = nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
+        self.out = nn.Sequential(
+                double_conv(self.mul * 2, self.mul * 2),
+                nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
+        )
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -109,16 +113,21 @@ class UNetModel(nn.Module):
         x5 = self.down4(x4)
         
         x = self.up0(x5)
+        x = self.dropout(x)
         x = torch.cat([x, x4], dim=1)
         x = self.up1(x)
+        x = self.dropout(x)
         x = torch.cat([x, x3], dim=1)
         x = self.up2(x)
+        x = self.dropout(x)
         x = torch.cat([x, x2], dim=1)
         x = self.up3(x)
+        x = self.dropout(x)
         x = torch.cat([x, x1], dim=1)
         x = self.out(x)
 
         return x 
+
 
 
 def training_function(config):
@@ -139,7 +148,7 @@ def training_function(config):
     model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
 
 
-    accelerator.load_state('logs_pangu/checkpoint_1214/best')
+    accelerator.load_state('logs_pangu/checkpoint_1214/epoch_299')
     for epoch in range(epoch_num):
         model.eval()
         accurate = 0
@@ -159,6 +168,8 @@ def training_function(config):
                 #print(m.shape)
                 #loss = criterion(out[0,(0,2,3)], y[0,(0,2,3)])
                 out1 = x[:,-4:]
+                print(y[0,0])
+                print(out1[0,0])
                 loss1 = criterion(out1[0,0], y[0,0])
                 #loss1 = criterion(out1, y)
                 #loss1 = criterion(out1[0,(0,2,3)], y[0,(0,2,3)])
@@ -168,6 +179,7 @@ def training_function(config):
                 print(i)
                 print('loss:', loss)
                 print('loss_1:',loss1, '\n')
+                break
     
         eval_metric = accurate / num_elems
         base_metric = base / num_elems
@@ -176,7 +188,7 @@ def training_function(config):
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 14, "mul_channels": 64}
+    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 14, "mul_channels": 96}
     config['filenames'] = 'data/meta/test_pangu_24.npy'
     training_function(config)
 
