@@ -89,6 +89,7 @@ class UNetModel(nn.Module):
         self.up3 = up(self.mul * 4, self.mul)
         self.out = nn.Sequential(
                 double_conv(self.mul * 2, self.mul * 2),
+                nn.Conv2d(self.mul * 2, self.mul * 2, kernel_size=1),
                 nn.Conv2d(self.mul * 2, 4, kernel_size=1)
         )
         self.dropout = nn.Dropout(0.5)
@@ -133,7 +134,7 @@ def training_function(config):
 
     accelerator = Accelerator(log_with="all", project_dir='logs_sat')
     hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
-    accelerator.init_trackers("log_1215", config=hps)
+    accelerator.init_trackers("log_1217", config=hps)
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
 
@@ -171,14 +172,14 @@ def training_function(config):
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
 
         if epoch > 250:
-            accelerator.save_state(f"./logs_sat/checkpoint_1215/epoch_{epoch}")
+            accelerator.save_state(f"./logs_sat/checkpoint_1217/epoch_{epoch}")
         if eval_metric < best_acc:
             best_acc = eval_metric
-            accelerator.save_state("./logs_sat/checkpoint_1215/best")
+            accelerator.save_state("./logs_sat/checkpoint_1217/best")
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 300, "seed": 42, "batch_size": 16, "in_channels": 10, "mul_channels": 96}
+    config = {"lr": 4e-5, "num_epochs": 300, "seed": 42, "batch_size": 32, "in_channels": 10, "mul_channels": 32}
     config['filenames'] = 'data/meta/train_pangu_24.npy'
     training_function(config)
 

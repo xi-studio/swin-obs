@@ -9,7 +9,7 @@ train_list = []
 val_list = []
 for x in res:
     name = time.strptime(x[0].split('_')[-3], "%Y%m%d%H%M")
-    if name.tm_mday < 25:
+    if name.tm_mday < 28:
         train_list.append(x)
     else:
         val_list.append(x)

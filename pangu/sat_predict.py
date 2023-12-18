@@ -33,24 +33,17 @@ class Radars(Dataset):
     def __getitem__(self, index):
 
         sate = np.load(self.list[index][0][1:]).astype(np.float32)
-        pred = np.load(self.list[index][1][1:]).astype(np.float32)
         obs  = np.load(self.list[index][2][1:]).astype(np.float32)
-
-        pred = pred[(3, 0, 1, 2), :, :]
 
         sate = np.nan_to_num(sate, nan=255)
         sate = (sate - 180.0) / (375.0 - 180.0)
 
-        pred = self.preprocess(pred)
         obs  = self.preprocess(obs)
 
         sate = resize(sate, (10, 256, 256))
-        pred = resize(pred, (4, 256, 256))
         obs  = resize(obs, (4, 256, 256))
 
-        pred_input  = np.concatenate((sate, pred), axis=0)
-
-        return pred_input, obs
+        return sate, obs
 
     def __len__(self):
         return len(self.list)
@@ -97,7 +90,7 @@ class UNetModel(nn.Module):
         self.out = nn.Sequential(
                 double_conv(self.mul * 2, self.mul * 2),
                 nn.Conv2d(self.mul * 2, self.mul * 2, kernel_size=1),
-                nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
+                nn.Conv2d(self.mul * 2, 4, kernel_size=1)
         )
         self.dropout = nn.Dropout(0.5)
 
@@ -128,66 +121,63 @@ def training_function(config):
     filenames     = np.load(config['filenames'])
     
     dataset = Radars(filenames) 
-    n_val = int(len(dataset) * 0.1)
-    n_train = len(dataset) - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
+    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 
 
     model = UNetModel(config)
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator(log_with="all", project_dir='logs_pangu')
-    hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
-    accelerator.init_trackers("log_1217", config=hps)
-    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
+    accelerator = Accelerator()
+    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
 
 
-    best_acc = 1
-    overall_step = 0
+    accelerator.load_state('logs_sat/checkpoint_1217/best')
     for epoch in range(epoch_num):
-        model.train()
-       
-        with tqdm(total=len(train_loader)) as pbar:
-            for i, (x, y) in enumerate(train_loader):
-               out = model(x)
-               loss = criterion(out, y)
-
-               optimizer.zero_grad()
-               accelerator.backward(loss)
-               optimizer.step()
-
-               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
-               pbar.update(1)
-
-               overall_step += 1
-               accelerator.log({"training_loss": loss}, step=overall_step)
-
         model.eval()
         accurate = 0
+        base = 0
         num_elems = 0
-        for _, (x, y) in enumerate(val_loader):
+       
+        for i, (x, y) in enumerate(test_loader):
             with torch.no_grad():
                 out = model(x)
-                loss = criterion(out, y)
+                #loss = criterion(out, y)
+                loss = criterion(out[0,0], y[0,0])
+                
+                np.save('pre_sur.npy', out.cpu().numpy())
+                np.save('obs_sur.npy', y.cpu().numpy())
+                break
+
+
+
+                #m = out.cpu().numpy()
+                #n = y.cpu().numpy()
+                #nloss = np.mean(np.abs(m[0,1] - n[0,1]))
+                #print('nloss:', nloss)
+                #print(m.shape)
+                #loss = criterion(out[0,(0,2,3)], y[0,(0,2,3)])
+                #out1 = x[:,-4:]
+                #print(y[0,0])
+                #print(out1[0,0])
+                #loss1 = criterion(out1[0,3], y[0,3])
+                #loss1 = criterion(out1[0,(0,2,3)], y[0,(0,2,3)])
                 num_elems += 1
                 accurate += loss 
+                #base += loss1
+                print(i)
+                print('loss:', loss)
+                #print('loss_1:',loss1, '\n')
     
         eval_metric = accurate / num_elems
-        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
-
-        if epoch > 450:
-            accelerator.save_state(f"./logs_pangu/checkpoint_1217/epoch_{epoch}")
-        if eval_metric < best_acc:
-            best_acc = eval_metric
-            accelerator.save_state("./logs_pangu/checkpoint_1217/best")
+        base_metric = base / num_elems
+        accelerator.print(f"epoch {epoch}: {eval_metric:}")
+        accelerator.print(f"epoch {epoch}: {base_metric:}")
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 500, "seed": 42, "batch_size": 32, "in_channels": 14, "mul_channels": 32}
-    config['filenames'] = 'data/meta/train_pangu_24.npy'
+    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 10, "mul_channels": 32}
+    config['filenames'] = 'data/meta/test_pangu_24.npy'
     training_function(config)
 
 if __name__ == '__main__':

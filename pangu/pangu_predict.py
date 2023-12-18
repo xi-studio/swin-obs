@@ -44,11 +44,6 @@ class Radars(Dataset):
         pred = self.preprocess(pred)
         obs  = self.preprocess(obs)
 
-        pred[1:] = 0
-        obs[1:] = 0
-
-
-
         sate = resize(sate, (10, 256, 256))
         pred = resize(pred, (4, 256, 256))
         obs  = resize(obs, (4, 256, 256))
@@ -101,6 +96,7 @@ class UNetModel(nn.Module):
         self.up3 = up(self.mul * 4, self.mul)
         self.out = nn.Sequential(
                 double_conv(self.mul * 2, self.mul * 2),
+                nn.Conv2d(self.mul * 2, self.mul * 2, kernel_size=1),
                 nn.Conv2d(self.mul * 2, self.n_channels - 10, kernel_size=1)
         )
         self.dropout = nn.Dropout(0.5)
@@ -113,16 +109,12 @@ class UNetModel(nn.Module):
         x5 = self.down4(x4)
         
         x = self.up0(x5)
-        x = self.dropout(x)
         x = torch.cat([x, x4], dim=1)
         x = self.up1(x)
-        x = self.dropout(x)
         x = torch.cat([x, x3], dim=1)
         x = self.up2(x)
-        x = self.dropout(x)
         x = torch.cat([x, x2], dim=1)
         x = self.up3(x)
-        x = self.dropout(x)
         x = torch.cat([x, x1], dim=1)
         x = self.out(x)
 
@@ -148,7 +140,8 @@ def training_function(config):
     model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
 
 
-    accelerator.load_state('logs_pangu/checkpoint_1214/epoch_299')
+    #accelerator.load_state('logs_pangu/checkpoint_1217/best')
+    accelerator.load_state('logs_pangu/checkpoint_1217/epoch_499')
     for epoch in range(epoch_num):
         model.eval()
         accurate = 0
@@ -158,8 +151,8 @@ def training_function(config):
         for i, (x, y) in enumerate(test_loader):
             with torch.no_grad():
                 out = model(x)
-                #loss = criterion(out, y)
-                loss = criterion(out[0,0], y[0,0])
+                loss = criterion(out, y)
+                #loss = criterion(out[0,3], y[0,3])
 
                 #m = out.cpu().numpy()
                 #n = y.cpu().numpy()
@@ -168,10 +161,10 @@ def training_function(config):
                 #print(m.shape)
                 #loss = criterion(out[0,(0,2,3)], y[0,(0,2,3)])
                 out1 = x[:,-4:]
-                print(y[0,0])
-                print(out1[0,0])
-                loss1 = criterion(out1[0,0], y[0,0])
-                #loss1 = criterion(out1, y)
+                #print(y[0,0])
+                #print(out1[0,0])
+                #loss1 = criterion(out1[0,3], y[0,3])
+                loss1 = criterion(out1, y)
                 #loss1 = criterion(out1[0,(0,2,3)], y[0,(0,2,3)])
                 num_elems += 1
                 accurate += loss 
@@ -179,7 +172,6 @@ def training_function(config):
                 print(i)
                 print('loss:', loss)
                 print('loss_1:',loss1, '\n')
-                break
     
         eval_metric = accurate / num_elems
         base_metric = base / num_elems
@@ -188,7 +180,7 @@ def training_function(config):
 
 
 def main(): 
-    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 14, "mul_channels": 96}
+    config = {"lr": 4e-5, "num_epochs": 1, "seed": 42, "batch_size": 1, "in_channels": 14, "mul_channels": 32}
     config['filenames'] = 'data/meta/test_pangu_24.npy'
     training_function(config)
 
