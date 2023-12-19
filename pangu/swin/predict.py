@@ -109,7 +109,7 @@ def training_function(config):
         for i, (x, y) in enumerate(test_loader):
             with torch.no_grad():
                 out = model(x)
-                loss = criterion(out, y)
+                loss = criterion(out[0,3], y[0,3])
 
                 num_elems += 1
                 accurate += loss 

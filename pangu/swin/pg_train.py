@@ -4,6 +4,8 @@ import os
 import re
 from tqdm import tqdm
 from skimage.transform import rescale, resize
+import warnings
+warnings.filterwarnings("ignore")
 
 import numpy as np
 import PIL

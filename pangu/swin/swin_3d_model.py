@@ -523,6 +523,7 @@ class SwinTransformer3D(nn.Module):
         self.frozen_stages = frozen_stages
         self.window_size = window_size
         self.patch_size = patch_size
+        self.in_chans = in_chans
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
@@ -674,7 +675,7 @@ class SwinTransformer3D(nn.Module):
 
     def forward(self, x):
         """Forward function."""
-        x = rearrange(x, 'n (c d) h w -> n c d h w', c=5)
+        x = rearrange(x, 'n (c d) h w -> n c d h w', c=self.in_chans)
         x = self.patch_embed(x)
         #print('patch_embed', x.shape)
         # [8, 96, 7, 64, 64]
