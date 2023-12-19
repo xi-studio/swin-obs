@@ -92,72 +92,45 @@ def training_function(config):
     fake          = config['fake']
     
     dataset = Radars(filenames, fake) 
-    n_val = int(len(dataset) * 0.1)
-    n_train = len(dataset) - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
+    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 
     model = UNetModel(config)
-    #criterion = nn.MSELoss()
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     accelerator = Accelerator(log_with="all", project_dir='logs_swin')
-    hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
-    accelerator.init_trackers("log_1218", config=hps)
-    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
+    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
 
-    best_acc = 1
-    overall_step = 0
+    accelerator.load_state('logs_swin/checkpoint_1218/best')
     for epoch in range(epoch_num):
-        model.train()
-       
-        with tqdm(total=len(train_loader)) as pbar:
-            for i, (x, y) in enumerate(train_loader):
-               out = model(x)
-               loss = criterion(out, y)
-
-               optimizer.zero_grad()
-               accelerator.backward(loss)
-               optimizer.step()
-
-               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
-               pbar.update(1)
-
-               overall_step += 1
-               accelerator.log({"training_loss": loss}, step=overall_step)
-
         model.eval()
         accurate = 0
         num_elems = 0
-        for _, (x, y) in enumerate(val_loader):
+        for i, (x, y) in enumerate(test_loader):
             with torch.no_grad():
                 out = model(x)
                 loss = criterion(out, y)
+
                 num_elems += 1
                 accurate += loss 
+                print(i)
+                print('loss:', loss)
     
         eval_metric = accurate / num_elems
-        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
-
-        if epoch > 250:
-            accelerator.save_state(f"./logs_swin/checkpoint_1218/epoch_{epoch}")
-        if eval_metric < best_acc:
-            best_acc = eval_metric
-            accelerator.save_state("./logs_swin/checkpoint_1218/best")
+        accelerator.print(f"epoch {epoch}: {eval_metric:}")
+       
 
 
 def main(): 
     config = {"lr": 4e-5, 
-              "num_epochs": 300, 
+              "num_epochs": 1, 
               "seed": 42, 
-              "batch_size": 12, 
+              "batch_size": 1, 
               "in_channels": 10, 
               "out_channels": 4, 
               "channels": 5, 
               "embed_dim": 96 * 2,
-              "filenames": '../data/meta/train_pangu_24.npy',
+              "filenames": '../data/meta/test_pangu_24.npy',
               "fake": False,
               "depths": [2, 6, 18]
               }

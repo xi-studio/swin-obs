@@ -674,7 +674,7 @@ class SwinTransformer3D(nn.Module):
 
     def forward(self, x):
         """Forward function."""
-        x = rearrange(x, 'n (c d) h w -> n c d h w', c=7)
+        x = rearrange(x, 'n (c d) h w -> n c d h w', c=5)
         x = self.patch_embed(x)
         #print('patch_embed', x.shape)
         # [8, 96, 7, 64, 64]
@@ -686,12 +686,8 @@ class SwinTransformer3D(nn.Module):
         x = self.layers[2](x.contiguous())
         
         # unembed
-        # x.shape [8, 96, 7, 64, 64]
         x = rearrange(x, 'n c d h w -> n d h w c')
         x = self.unembed(x)
-        # x = self.gelu(x) 
-        # x = rearrange(x, 'n d h w (d0 h0 w0 c) -> n (d0 d) (h0 h) (w0 w) c', d0=self.patch_size[0], h0=self.patch_size[1], w0=self.patch_size[2])
-        # x = rearrange(x, 'n d h w (d0 h0 w0 c) -> n c (d d0) (h h0) (w w0)', d0=self.patch_size[0], h0=self.patch_size[1], w0=self.patch_size[2])
         x = rearrange(x, 'n d h w (d0 h0 w0 c) -> n (d d0) (h h0) (w w0) c', d0=self.patch_size[0], h0=self.patch_size[1], w0=self.patch_size[2])
         x = rearrange(x, 'n d h w c -> n (c d) h w')
         return x
@@ -703,14 +699,14 @@ class SwinTransformer3D(nn.Module):
         
 
 if __name__ == '__main__':
-    model = SwinTransformer3D(in_chans=7, 
+    model = SwinTransformer3D(in_chans=5, 
                               patch_size=(2,4,4), 
                               embed_dim=48, 
                               window_size=(2,7,7), 
-                              depths=[2, 2, 2]
+                              depths=[2, 2, 4]
                               )
     #model.cuda()
-    x = torch.rand((16,14,256,256)) # B, C, D, H, W
+    x = torch.rand((16,10,256,256)) # B, C, D, H, W
     #x = x.cuda()
     print('input', x.shape)
     y = model(x)
