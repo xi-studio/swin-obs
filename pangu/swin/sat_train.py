@@ -16,7 +16,6 @@ from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
 from swin_3d_model import SwinTransformer3D 
 
-
 class Radars(Dataset):
     def __init__(self, filenames, fake=False):
         super(Radars, self).__init__()
@@ -38,30 +37,24 @@ class Radars(Dataset):
 
         if self.fake!=True:
             sate = np.load(self.list[index][0][1:]).astype(np.float32)
-            pred = np.load(self.list[index][1][1:]).astype(np.float32)
             obs  = np.load(self.list[index][2][1:]).astype(np.float32)
-
-            pred = pred[(3, 0, 1, 2), :, :]
 
             sate = np.nan_to_num(sate, nan=255)
             sate = (sate - 180.0) / (375.0 - 180.0)
 
-            pred = self.preprocess(pred)
             obs  = self.preprocess(obs)
 
             sate = resize(sate, (10, 256, 256))
-            pred = resize(pred, (4, 256, 256))
             obs  = resize(obs, (4, 256, 256))
-
-            pred_input = np.concatenate((sate, pred), axis=0)
         else:
-            pred_input = np.ones((14, 256, 256), dtype=np.float32)
-            obs  = np.ones((4, 256, 256), dtype=np.float32)
+            sate = np.ones((79, 256, 256), dtype=np.float32)
+            obs  = np.ones((69, 256, 256), dtype=np.float32)
 
-        return pred_input, obs
+        return sate, obs
 
     def __len__(self):
         return len(self.list)
+
 class UNetModel(nn.Module):
 
     def __init__(self, config):
@@ -80,12 +73,17 @@ class UNetModel(nn.Module):
                               window_size=(2,7,7), 
                               depths=self.depths
                               )
-        self.out = nn.Sequential(
+        self.head = nn.Sequential(
                 nn.Conv2d(self.in_chans, self.dim, kernel_size=1),
+                nn.Conv2d(self.dim, 80, kernel_size=1)
+        )
+        self.out = nn.Sequential(
+                nn.Conv2d(80, self.dim, kernel_size=1),
                 nn.Conv2d(self.dim, self.out_chans, kernel_size=1)
         )
 
     def forward(self, x):
+        x = self.head(x)
         x = self.swin3d(x)
         x = self.out(x)
 
@@ -99,47 +97,72 @@ def training_function(config):
     fake          = config['fake']
     
     dataset = Radars(filenames, fake) 
-    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=8)
+    n_val = int(len(dataset) * 0.1)
+    n_train = len(dataset) - n_val
+    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
 
     model = UNetModel(config)
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator(log_with="all", project_dir='logs_pangu')
-    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
+    accelerator = Accelerator(log_with="all", project_dir='logs_swin')
+    hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
+    accelerator.init_trackers("log_1220", config=hps)
+    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
-    #accelerator.load_state('logs_pangu/checkpoint_1219/best')
-    accelerator.load_state('logs_pangu/checkpoint_1219/epoch_255')
+    best_acc = 1
+    overall_step = 0
     for epoch in range(epoch_num):
+        model.train()
+       
+        with tqdm(total=len(train_loader)) as pbar:
+            for i, (x, y) in enumerate(train_loader):
+               out = model(x)
+               loss = criterion(out, y)
+
+               optimizer.zero_grad()
+               accelerator.backward(loss)
+               optimizer.step()
+
+               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
+               pbar.update(1)
+
+               overall_step += 1
+               accelerator.log({"training_loss": loss}, step=overall_step)
+
         model.eval()
         accurate = 0
         num_elems = 0
-        for i, (x, y) in enumerate(test_loader):
+        for _, (x, y) in enumerate(val_loader):
             with torch.no_grad():
                 out = model(x)
                 loss = criterion(out, y)
-
                 num_elems += 1
                 accurate += loss 
-                print(i)
-                print('loss:', loss)
     
         eval_metric = accurate / num_elems
-        accelerator.print(f"epoch {epoch}: {eval_metric:}")
-       
+        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
+
+        if epoch > 250:
+            accelerator.save_state(f"./logs_sat/checkpoint_1220/epoch_{epoch}")
+        if eval_metric < best_acc:
+            best_acc = eval_metric
+            accelerator.save_state("./logs_sat/checkpoint_1220/best")
 
 
 def main(): 
     config = {"lr": 4e-5, 
-              "num_epochs": 1, 
+              "num_epochs": 500, 
               "seed": 42, 
-              "batch_size": 1, 
-              "in_channels": 14, 
-              "out_channels": 4, 
-              "channels": 7, 
-              "embed_dim": 96 * 2,
-              "filenames": '../data/meta/test_pangu_24.npy',
-              "fake": False,
+              "batch_size": 2, 
+              "in_channels": 79, 
+              "out_channels": 69, 
+              "channels": 10, 
+              "embed_dim": 96 * 3,
+              "filenames": '../data/meta/train_pangu_24.npy',
+              "fake": True,
               "depths": [2, 6, 18]
               }
 
