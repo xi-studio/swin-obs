@@ -14,7 +14,7 @@ def check_MAE(x, pred):
     mslp   = np.mean(np.abs(pred[1] - x[1]))
     u = np.mean(np.abs(pred[2] - x[2]))
     v = np.mean(np.abs(pred[3] - x[3]))
-    cat = np.mean(np.abs(pred - x) / x)
+    cat = np.mean(np.abs(pred - x))
 
     return (tem, mslp, u, v, cat)
 
