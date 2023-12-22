@@ -72,14 +72,15 @@ class Radars(Dataset):
         return obs, sate
 
     def __len__(self):
-        return 200#len(self.list)
+        return len(self.list)
 
 if __name__ == '__main__':
 
-    filename = np.load('data/meta/era5_to_sat_train.npy')
-    a = Radars(filenames=filename, fake=False)
+    #filename = np.load('data/meta/era5_to_sat_train.npy')
+    filename = np.arange(100)
+    a = Radars(filenames=filename, fake=True)
 
     train_loader = DataLoader(a, batch_size=1, shuffle=True, num_workers=4)
     for x in train_loader:
-        print(x[0].shape)
+        print(x[0].shape, x[1].shape)
         break

@@ -2,6 +2,7 @@ import torch
 import argparse
 import os
 import re
+import yaml
 from tqdm import tqdm
 from skimage.transform import rescale, resize
 
@@ -21,17 +22,19 @@ from unet import UNetModel
 def training_function(config):
     epoch_num     = config['num_epochs']
     batch_size    = config['batch_size']
+    num_workers   = config['num_workers']
     learning_rate = config['lr']
     filenames     = np.load(config['filenames'])
     fake          = config['fake']
     log_time      = config['log_time']
     
     dataset = Radars(filenames, fake) 
-    n_val = int(len(dataset) * 0.1)
+    n_val   = int(len(dataset) * 0.1)
     n_train = len(dataset) - n_val
     train_ds, val_ds = random_split(dataset, [n_train, n_val])
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     model = UNetModel(config)
     criterion = nn.L1Loss()
@@ -83,17 +86,14 @@ def training_function(config):
 
 
 def main(): 
-    config = {"lr": 4e-5, 
-              "num_epochs": 300, 
-              "seed": 42, 
-              "batch_size": 4, 
-              "in_channels": 69, 
-              "out_channels": 10, 
-              "mul_channels": 96, 
-              "filenames": '../data/meta/train_pangu_24.npy',
-              "fake": True,
-              "log_time": '1221'
-              }
+    parser = argparse.ArgumentParser('Era5 to satelite Unet', add_help=False)
+    parser.add_argument('--cfg', type=str, required=True, metavar="FILE", help='path to config file', )
+    args, unparsed = parser.parse_known_args()
+
+    with open(args.cfg, "r") as f:
+        res = yaml.load(f, Loader=yaml.FullLoader)
+
+    config = res[0]['config']
 
     training_function(config)
 
