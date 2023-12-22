@@ -25,11 +25,25 @@ class Radars(Dataset):
 
         return x
 
-    def load_gcs(filename):
+    def load_sat(self, filename):
         fs = gcsfs.GCSFileSystem(project='era5_jy_test')
         with fs.open(filename,'rb') as f:
             res = np.load(f)
+            print(filename)
             return res
+
+    def load_obs(self, filename):
+        fs = gcsfs.GCSFileSystem(project='era5_jy_test')
+        with fs.open(filename,'rb') as f:
+            res = np.load(f)
+            sur = res['surface']
+            upp = res['upper']
+
+            N, C, W, H = upp.shape
+            upp = upp.reshape((N*C, W, H))
+            obs = np.concatenate((sur, upp), axis=0)
+
+            return obs
 
 
     def __getitem__(self, index):
@@ -38,10 +52,9 @@ class Radars(Dataset):
             if self.TPU:
                 satename = 'himawari-caiyun/china_himawari/' + self.list[index][0]
                 obsname  = 'era5_jy_test/pangu/era5_obs_2020/' + self.list[index][1]
-                sate = load_gcs(satename)
-                obs  = load_gcs(obsname)
+                sate = self.load_sat(satename)
+                obs  = self.load_obs(obsname)
 
-                obs  = np.ones((69, 256, 256), dtype=np.float32)
 
             else:
                 sate = np.load(self.list[index][0][1:]).astype(np.float32)
@@ -64,5 +77,11 @@ class Radars(Dataset):
         return 200#len(self.list)
 
 if __name__ == '__main__':
-    pritn('hell')
 
+    filename = np.load('data/meta/era5_to_sat_train.npy')
+    a = Radars(filenames=filename, fake=True, TPU=False)
+
+    train_loader = DataLoader(a, batch_size=1, shuffle=True, num_workers=4)
+    for x in train_loader:
+        print(x[0].shape)
+        break
