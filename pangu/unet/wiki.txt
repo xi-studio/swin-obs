@@ -1,0 +1,1 @@
+python train.py --cfg configs/unet_01.yaml --batch_size 1 --fake True --filenames ./data/train --num_epoch 1 --log_time 1222

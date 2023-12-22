@@ -19,14 +19,19 @@ from mydataset import Radars
 from unet import UNetModel
 
 
-def training_function(config):
-    epoch_num     = config['num_epochs']
-    batch_size    = config['batch_size']
-    num_workers   = config['num_workers']
+def training_function(args, config):
+    epoch_num     = args.num_epoch
+    batch_size    = args.batch_size 
+    num_workers   = args.num_workers
+    batch_size    = args.batch_size 
+    fake          = args.fake
+    log_time      = args.log_time
     learning_rate = config['lr']
-    filenames     = np.load(config['filenames'])
-    fake          = config['fake']
-    log_time      = config['log_time']
+
+    filenames     = np.arange(100) 
+
+    if args.fake == False:
+        filenames = np.load(config['filenames'])
     
     dataset = Radars(filenames, fake) 
     n_val   = int(len(dataset) * 0.1)
@@ -86,8 +91,14 @@ def training_function(config):
 
 
 def main(): 
-    parser = argparse.ArgumentParser('Era5 to satelite Unet', add_help=False)
+    parser = argparse.ArgumentParser('Era5 to satelite Unet', add_help=True)
     parser.add_argument('--cfg', type=str, required=True, metavar="FILE", help='path to config file', )
+    parser.add_argument('--batch_size', type=int, default=1, help="batch size for single GPU")
+    parser.add_argument('--num_epoch', type=int, default=2, help="epochs")
+    parser.add_argument('--num_workers', type=int, default=8, help="num workers")
+    parser.add_argument('--log_time', type=str, default='1222', help="log time name")
+    parser.add_argument('--filenames', type=str, help="data filenames")
+    parser.add_argument('--fake', type=bool, default=False, help="if fake data")
     args, unparsed = parser.parse_known_args()
 
     with open(args.cfg, "r") as f:
@@ -95,7 +106,7 @@ def main():
 
     config = res[0]['config']
 
-    training_function(config)
+    training_function(args, config)
 
 if __name__ == '__main__':
     main()
