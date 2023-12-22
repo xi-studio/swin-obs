@@ -25,23 +25,35 @@ class Radars(Dataset):
 
         return x
 
+    def load_gcs(filename):
+        fs = gcsfs.GCSFileSystem(project='era5_jy_test')
+        with fs.open(filename,'rb') as f:
+            res = np.load(f)
+            return res
+
+
     def __getitem__(self, index):
 
         if self.fake!=True:
             if self.TPU:
-                fs = gcsfs.GCSFileSystem(project='era5_jy_test')
-                with fs.open('','rb') as f:
-                    np.load(f)
-            sate = np.load(self.list[index][0][1:]).astype(np.float32)
-            obs  = np.load(self.list[index][2][1:]).astype(np.float32)
+                satename = 'himawari-caiyun/china_himawari/' + self.list[index][0]
+                obsname  = 'era5_jy_test/pangu/era5_obs_2020/' + self.list[index][1]
+                sate = load_gcs(satename)
+                obs  = load_gcs(obsname)
 
-            sate = np.nan_to_num(sate, nan=255)
-            sate = (sate - 180.0) / (375.0 - 180.0)
+                obs  = np.ones((69, 256, 256), dtype=np.float32)
 
-            obs  = self.preprocess(obs)
+            else:
+                sate = np.load(self.list[index][0][1:]).astype(np.float32)
+                obs  = np.load(self.list[index][2][1:]).astype(np.float32)
 
-            sate = resize(sate, (10, 256, 256))
-            obs  = resize(obs, (4, 256, 256))
+                sate = np.nan_to_num(sate, nan=255)
+                sate = (sate - 180.0) / (375.0 - 180.0)
+
+                obs  = self.preprocess(obs)
+
+                sate = resize(sate, (10, 256, 256))
+                obs  = resize(obs, (4, 256, 256))
         else:
             sate = np.ones((10, 256, 256), dtype=np.float32)
             obs  = np.ones((69, 256, 256), dtype=np.float32)
