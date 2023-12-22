@@ -14,80 +14,9 @@ import torchvision.datasets as datasets
 from accelerate import Accelerator
 from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
-from swin_3d_model import SwinTransformer3D 
+from mydataset import Radars
+from unet import UNetModel
 
-class Radars(Dataset):
-    def __init__(self, filenames, fake=False):
-        super(Radars, self).__init__()
-
-        self.list = filenames 
-        self.fake = fake
-
-    def preprocess(self, x):
-        x[0] = (x[0] - 220.0) / (315.0 - 220.0)
-        x[1] = (x[1]/100.0 - 950.0) / (1050.0 - 950.0)
-        x[2] = (x[2] - (-30.0)) / (30.0 - (-30.0))
-        x[3] = (x[3] - (-30.0)) / (30.0 - (-30.0))
-
-        return x
-
-
-    def __getitem__(self, index):
-
-
-        if self.fake!=True:
-            sate = np.load(self.list[index][0][1:]).astype(np.float32)
-            obs  = np.load(self.list[index][2][1:]).astype(np.float32)
-
-            sate = np.nan_to_num(sate, nan=255)
-            sate = (sate - 180.0) / (375.0 - 180.0)
-
-            obs  = self.preprocess(obs)
-
-            sate = resize(sate, (10, 256, 256))
-            obs  = resize(obs, (4, 256, 256))
-        else:
-            sate = np.ones((10, 256, 256), dtype=np.float32)
-            obs  = np.ones((69, 256, 256), dtype=np.float32)
-
-        return obs, sate
-
-    def __len__(self):
-        return 200#len(self.list)
-
-class UNetModel(nn.Module):
-
-    def __init__(self, config):
-        super(UNetModel, self).__init__()
-
-        self.in_chans = config['in_channels']
-        self.out_chans = config['out_channels']
-        self.chans = config['channels']
-        self.dim = config['embed_dim']
-        self.depths = config['depths']
-
-        
-        self.swin3d = SwinTransformer3D(in_chans=self.chans, 
-                              patch_size=(2,4,4), 
-                              embed_dim=self.dim, 
-                              window_size=(2,7,7), 
-                              depths=self.depths
-                              )
-        self.head = nn.Sequential(
-                nn.Conv2d(self.in_chans, self.dim, kernel_size=1),
-                nn.Conv2d(self.dim, 80, kernel_size=1)
-        )
-        self.out = nn.Sequential(
-                nn.Conv2d(80, self.dim, kernel_size=1),
-                nn.Conv2d(self.dim, self.out_chans, kernel_size=1)
-        )
-
-    def forward(self, x):
-        x = self.head(x)
-        x = self.swin3d(x)
-        x = self.out(x)
-
-        return x 
 
 def training_function(config):
     epoch_num     = config['num_epochs']
@@ -155,16 +84,14 @@ def training_function(config):
 
 def main(): 
     config = {"lr": 4e-5, 
-              "num_epochs": 500, 
+              "num_epochs": 300, 
               "seed": 42, 
-              "batch_size": 2, 
+              "batch_size": 4, 
               "in_channels": 69, 
               "out_channels": 10, 
-              "channels": 10, 
-              "embed_dim": 96,
+              "mul_channels": 96, 
               "filenames": '../data/meta/train_pangu_24.npy',
               "fake": True,
-              "depths": [2, 6, 18],
               "log_time": '1221'
               }
 
