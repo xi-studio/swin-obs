@@ -31,7 +31,7 @@ def training_function(args, config):
     filenames     = np.arange(100) 
 
     if args.fake == False:
-        filenames = np.load(config['filenames'])
+        filenames = np.load(args.filenames)
     
     dataset = Radars(filenames, fake) 
     n_val   = int(len(dataset) * 0.1)
