@@ -15,7 +15,6 @@ class Radars(Dataset):
 
         self.list = filenames 
         self.fake = fake
-        self.TPU  = TPU
 
     def preprocess(self, x, y):
         x[0] = (x[0] - 220.0) / (315.0 - 220.0)         #temp
@@ -26,8 +25,8 @@ class Radars(Dataset):
         y[0] = (y[0] - 0.0) / (160.0 - 0.0)             #geopotential
         y[1] = (y[1] - 185.0) / (315.0 - 185.0)         #temperature
         y[2] = (y[2] - 0.0) / (0.02 - 0.0)              #specific_humidity
-        y[3] = (y[3] - (-60) / (60.0 - (-60.0))         #u_component_of_wind
-        y[4] = (y[4] - (-60) / (60.0 - (-60.0))         #v_component_of_wind
+        y[3] = (y[3] - (-60)) / (60.0 - (-60.0))         #u_component_of_wind
+        y[4] = (y[4] - (-60)) / (60.0 - (-60.0))         #v_component_of_wind
         
         obs = np.concatenate((x, y), axis=0)
 
@@ -78,7 +77,7 @@ class Radars(Dataset):
 if __name__ == '__main__':
 
     filename = np.load('data/meta/era5_to_sat_train.npy')
-    a = Radars(filenames=filename, fake=True)
+    a = Radars(filenames=filename, fake=False)
 
     train_loader = DataLoader(a, batch_size=1, shuffle=True, num_workers=4)
     for x in train_loader:
