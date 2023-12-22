@@ -23,6 +23,7 @@ class Radars(Dataset):
         x[2] = (x[2] - (-30.0)) / (30.0 - (-30.0))
         x[3] = (x[3] - (-30.0)) / (30.0 - (-30.0))
 
+
         return x
 
     def load_sat(self, filename):
@@ -60,13 +61,13 @@ class Radars(Dataset):
                 sate = np.load(self.list[index][0][1:]).astype(np.float32)
                 obs  = np.load(self.list[index][2][1:]).astype(np.float32)
 
-                sate = np.nan_to_num(sate, nan=255)
-                sate = (sate - 180.0) / (375.0 - 180.0)
+            sate = np.nan_to_num(sate, nan=255)
+            sate = (sate - 180.0) / (375.0 - 180.0)
 
-                obs  = self.preprocess(obs)
+            obs  = self.preprocess(obs)
 
-                sate = resize(sate, (10, 256, 256))
-                obs  = resize(obs, (4, 256, 256))
+            sate = resize(sate, (10, 256, 256))
+            obs  = resize(obs, (4, 256, 256))
         else:
             sate = np.ones((10, 256, 256), dtype=np.float32)
             obs  = np.ones((69, 256, 256), dtype=np.float32)
