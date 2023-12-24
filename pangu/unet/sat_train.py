@@ -15,7 +15,7 @@ import torchvision.datasets as datasets
 from accelerate import Accelerator
 from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
-from mydataset import Radars
+from sat_dataset import Radars
 from unet import UNetModel
 
 
