@@ -15,22 +15,13 @@ class Radars(Dataset):
 
         self.list = filenames 
         self.fake = fake
+        statis = np.load('data/statis.npz')
+        m = np.ones((241*281, 69)) * statis['mean']
+        s = np.ones((241*281, 69)) * statis['std']
+        self.mean = (m.T).reshape((69, 241, 281))
+        self.std  = (s.T).reshape((69, 241, 281))
 
-    def preprocess(self, x, y):
-        x[0] = (x[0] - 220.0) / (315.0 - 220.0)         #temp
-        x[1] = (x[1]/100.0 - 950.0) / (1050.0 - 950.0)  #mslp
-        x[2] = (x[2] - (-30.0)) / (30.0 - (-30.0))      #wind_u
-        x[3] = (x[3] - (-30.0)) / (30.0 - (-30.0))      #wind_v
 
-        y[0] = (y[0] - 0.0) / (160.0 - 0.0)             #geopotential
-        y[1] = (y[1] - 185.0) / (315.0 - 185.0)         #temperature
-        y[2] = (y[2] - 0.0) / (0.02 - 0.0)              #specific_humidity
-        y[3] = (y[3] - (-60)) / (60.0 - (-60.0))        #u_component_of_wind
-        y[4] = (y[4] - (-60)) / (60.0 - (-60.0))        #v_component_of_wind
-        
-        obs = np.concatenate((x, y), axis=0)
-
-        return obs
 
     def load_sat(self, filename):
         sate = np.load(filename)
@@ -46,7 +37,9 @@ class Radars(Dataset):
  
         N, C, W, H = upp.shape
         upp = upp.reshape((N*C, W, H))
-        obs  = self.preprocess(sur, upp)
+
+        obs = np.concatenate((sur, upp), axis=0)
+        obs = (obs - self.mean) / self.std
  
         return obs
  
@@ -71,7 +64,6 @@ class Radars(Dataset):
         return len(self.list)
 
 if __name__ == '__main__':
-
     filename = np.load('data/meta/era5_to_sat_train.npy')
     a = Radars(filenames=filename, fake=False)
 
