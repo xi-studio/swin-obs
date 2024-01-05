@@ -1,8 +1,8 @@
 import torch
 import argparse
 import os
-import yaml
 import re
+import yaml
 from tqdm import tqdm
 from skimage.transform import rescale, resize
 
@@ -32,38 +32,62 @@ def training_function(args, config):
 
     if args.fake == False:
         filenames = np.load(args.filenames)
-
+    
     dataset = Radars(filenames, fake) 
-    test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    n_val   = int(len(dataset) * 0.1)
+    n_train = len(dataset) - n_val
+    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     model = UNetModel(config)
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     accelerator = Accelerator(log_with="all", project_dir='logs_sat')
-    model, optimizer, test_loader = accelerator.prepare(model, optimizer, test_loader)
+    hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
+    accelerator.init_trackers(f"log_{log_time}" , config=hps)
+    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
 
-    accelerator.load_state('logs_sat/checkpoint_s2e_1225/best')
+    best_acc = 1
+    overall_step = 0
     for epoch in range(epoch_num):
+        model.train()
+       
+        with tqdm(total=len(train_loader)) as pbar:
+            for i, (x, y) in enumerate(train_loader):
+               out = model(x)
+               loss = criterion(out, y)
+
+               optimizer.zero_grad()
+               accelerator.backward(loss)
+               optimizer.step()
+
+               pbar.set_description("train epoch[{}/{}] loss:{:.5f}".format(epoch + 1, epoch_num, loss))
+               pbar.update(1)
+
+               overall_step += 1
+               accelerator.log({"training_loss": loss}, step=overall_step)
+
         model.eval()
         accurate = 0
         num_elems = 0
-       
-        for i, (obs, sate) in enumerate(test_loader):
+        for _, (x, y) in enumerate(val_loader):
             with torch.no_grad():
-                out = model(sate)
-                loss = criterion(out, obs)
-                
-                np.save('pre_sur.npy', out.cpu().numpy())
-                np.save('obs_sur.npy', obs.cpu().numpy())
-
+                out = model(x)
+                loss = criterion(out, y)
                 num_elems += 1
                 accurate += loss 
-                print(i)
-                print('loss:', loss)
-                break 
+    
         eval_metric = accurate / num_elems
-        accelerator.print(f"epoch {epoch}: {eval_metric:}")
+        accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
+
+        if epoch > 250:
+            accelerator.save_state(f"./logs_sat/checkpoint_{log_time}/epoch_{epoch}")
+        if eval_metric < best_acc:
+            best_acc = eval_metric
+            accelerator.save_state(f"./logs_sat/checkpoint_{log_time}/best")
 
 
 def main(): 
