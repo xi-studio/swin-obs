@@ -12,19 +12,25 @@ class UNetModel(nn.Module):
 
         def double_conv(in_channels, out_channels):
             return nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1),
+                nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
                 nn.GroupNorm(32, out_channels),
                 nn.SiLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, kernel_size=1),
+                nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
                 nn.GroupNorm(32, out_channels),
                 nn.SiLU(inplace=True),
             )
 
         def down(in_channels, out_channels):
-            return double_conv(in_channels, out_channels)
+            return nn.Sequential(
+                nn.MaxPool2d(2),
+                double_conv(in_channels, out_channels)
+            )
    
         def up(in_channels, out_channels):
-            return double_conv(in_channels, out_channels)
+            return nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+                double_conv(in_channels, out_channels)
+            )
 
         self.inc = double_conv(self.in_channels, self.mul)
         self.down1 = down(self.mul, self.mul * 2)
