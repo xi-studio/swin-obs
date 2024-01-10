@@ -18,8 +18,9 @@ for i, x in enumerate(res):
     t0 = base + tname
     #print(t0)
     if os.path.isfile(t0):
-        my_list.append((tname, x[0], x[1]))
         print(t0)
-np.save('./data/meta/sat_two_train.npy', np.array(my_list))
+        np.load(t0)
+        my_list.append((tname, x[0], x[1]))
+#np.save('./data/meta/sat_two_train.npy', np.array(my_list))
     
 
