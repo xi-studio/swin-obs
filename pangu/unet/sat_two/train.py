@@ -16,7 +16,7 @@ from accelerate import Accelerator
 from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
 from sat_dataset import Radars
-from unet import UNetModel
+from model import UNetModel
 
 
 def training_function(args, config):
