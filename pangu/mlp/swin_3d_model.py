@@ -717,12 +717,16 @@ class UNetModel(nn.Module):
                               window_size=(2,7,7), 
                               depths=self.depths
                               )
+        self.head = nn.Sequential(
+                nn.Conv2d(self.in_chans, self.chans * 10, kernel_size=1),
+        )
         self.out = nn.Sequential(
-                nn.Conv2d(self.in_chans, self.dim, kernel_size=1),
+                nn.Conv2d(self.chans * 10, self.dim, kernel_size=1),
                 nn.Conv2d(self.dim, self.out_chans, kernel_size=1)
         )
 
     def forward(self, x):
+        x = self.head(x)
         x = self.swin3d(x)
         x = self.out(x)
 

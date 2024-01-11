@@ -1,4 +1,5 @@
 import torch
+import yaml
 import argparse
 import os
 import re
@@ -14,6 +15,7 @@ import torchvision.datasets as datasets
 from accelerate import Accelerator
 from torchvision.transforms import Compose, RandomResizedCrop, Resize, ToTensor
 
+from sat_dataset import Radars
 from swin_3d_model import UNetModel 
 
 def training_function(args, config):
@@ -80,8 +82,6 @@ def training_function(args, config):
         eval_metric = accurate / num_elems
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
 
-        if epoch > 250:
-            accelerator.save_model(model, f"./logs_sat/checkpoint_{log_time}/epoch_{epoch}", safe_serialization=False)
         if eval_metric < best_acc:
             best_acc = eval_metric
             accelerator.save_model(model, f"./logs_sat/checkpoint_{log_time}/best", safe_serialization=False)
