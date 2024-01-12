@@ -34,19 +34,15 @@ def training_function(args, config):
         filenames = np.load(args.filenames)
     
     dataset = Radars(filenames, fake) 
-    n_val   = int(len(dataset) * 0.1)
-    n_train = len(dataset) - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     model = UNetModel(config)
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     accelerator = Accelerator()
-    model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
+    model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
 
     unwrapped_model = accelerator.unwrap_model(model)
     unwrapped_model.load_state_dict(torch.load('logs_sat/checkpoint_0110/best/pytorch_model.bin'))
@@ -57,7 +53,7 @@ def training_function(args, config):
         unwrapped_model.eval()
         accurate = 0
         num_elems = 0
-        for _, (x, y) in enumerate(val_loader):
+        for _, (x, y) in enumerate(train_loader):
             with torch.no_grad():
                 out = unwrapped_model(x)
                 loss = criterion(out, y)

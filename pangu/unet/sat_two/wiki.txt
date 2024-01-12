@@ -8,4 +8,4 @@ python train.py --cfg configs/unet.yaml --batch_size 1 --fake True --filenames .
 python train.py --cfg configs/unet.yaml --batch_size 8 --filenames ./data/meta/sat_two_train.npy --num_epoch 1 --log_time 0110
 
 
-accelerate launch --cpu predict.py --cfg configs/unet.yaml --batch_size 8 --filenames ./data/meta/sat_two_train.npy --num_epoch 1 --log_time 0112
+accelerate launch --cpu predict.py --cfg configs/unet.yaml --batch_size 1 --filenames ./data/meta/sat_two_test.npy --num_epoch 1 --log_time 0112
