@@ -3,3 +3,9 @@ python train.py --cfg configs/unet_01.yaml --batch_size 1 --fake True --filename
 accelerate launch train.py --cfg configs/unet_01.yaml --batch_size 8 --filenames ./data/meta/era5_to_sat_train.npy --num_epoch 300 --log_time 1222
 
 python train.py --cfg configs/unet.yaml --batch_size 1 --fake True --filenames ./data/train --num_epoch 1 --log_time 0110
+
+
+python train.py --cfg configs/unet.yaml --batch_size 8 --filenames ./data/meta/sat_two_train.npy --num_epoch 1 --log_time 0110
+
+
+accelerate launch --cpu predict.py --cfg configs/unet.yaml --batch_size 8 --filenames ./data/meta/sat_two_train.npy --num_epoch 1 --log_time 0112
