@@ -54,8 +54,8 @@ class Radars(Dataset):
             sate = resize(sate, (10, 256, 256))
             obs  = resize(obs, (69, 256, 256))
         else:
-            sate = np.ones((10, 256, 256), dtype=np.float32)
-            obs  = np.ones((69, 256, 256), dtype=np.float32)
+            sate = np.ones((69, 256, 256), dtype=np.float32)
+            obs  = np.ones((79, 256, 256), dtype=np.float32)
 
         return obs, sate
 

@@ -45,7 +45,7 @@ def training_function(args, config):
     criterion = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    accelerator = Accelerator(log_with="all", project_dir='logs_sat')
+    accelerator = Accelerator(log_with="all", project_dir='logs_tonghua')
     hps = {"num_iterations": epoch_num, "learning_rate": learning_rate}
     accelerator.init_trackers(f"log_{log_time}" , config=hps)
     model, optimizer, train_loader, val_loader = accelerator.prepare(model, optimizer, train_loader, val_loader)
@@ -85,7 +85,7 @@ def training_function(args, config):
 
         if eval_metric < best_acc:
             best_acc = eval_metric
-            accelerator.save_model(model, f"./logs_sat/checkpoint_{log_time}/best", safe_serialization=False)
+            accelerator.save_model(model, f"./logs_tonghua/checkpoint_{log_time}/best", safe_serialization=False)
 
 
 def main(): 
