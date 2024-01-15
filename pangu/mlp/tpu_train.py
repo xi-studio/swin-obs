@@ -83,11 +83,9 @@ def training_function(args, config):
         eval_metric = accurate / num_elems
         accelerator.print(f"epoch {epoch}: {eval_metric:.5f}")
 
-        if epoch > 250:
-            accelerator.save_state(f"./logs_sat/checkpoint_{log_time}/epoch_{epoch}")
         if eval_metric < best_acc:
             best_acc = eval_metric
-            accelerator.save_state(f"./logs_sat/checkpoint_{log_time}/best")
+            accelerator.save_model(model, f"./logs_sat/checkpoint_{log_time}/best", safe_serialization=False)
 
 
 def main(): 

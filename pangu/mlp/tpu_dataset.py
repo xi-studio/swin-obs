@@ -22,7 +22,6 @@ class Radars(Dataset):
         self.std  = (s.T).reshape((69, 241, 281))
 
 
-
     def load_sat(self, filename):
         sate = np.load(filename)
         sate = np.nan_to_num(sate, nan=255)
