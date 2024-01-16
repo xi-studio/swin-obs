@@ -28,7 +28,7 @@ def training_function(args, config):
     log_time      = args.log_time
     learning_rate = config['lr']
 
-    filenames     = np.arange(100) 
+    filenames     = np.arange(1000) 
 
     if args.fake == False:
         filenames = np.load(args.filenames)
