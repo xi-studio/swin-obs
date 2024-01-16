@@ -46,7 +46,7 @@ class Radars(Dataset):
     def __getitem__(self, index):
 
         if self.fake!=True:
-            satename = './data/train/sat_2020/' + self.list[index][0]
+            satename = self.list[index][0]
             obsname  = './data/train/era5_obs_2020/' + self.list[index][1]
             sate = self.load_sat(satename).astype(np.float32)
             obs  = self.load_obs(obsname).astype(np.float32)
