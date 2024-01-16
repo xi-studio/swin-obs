@@ -39,9 +39,9 @@ class Radars(Dataset):
         return obs
 
     def load_era5(self, filename):
-        era5 = np.load(filenmae)
+        era5 = np.load(filename)
  
-        pre = self.load_obs(era5['pre_sur'], era5['pre_uppper'])
+        pre = self.load_obs(era5['pre_sur'], era5['pre_upper'])
         obs = self.load_obs(era5['obs_sur'], era5['obs_upper'])
 
         return pre, obs
@@ -72,9 +72,9 @@ class Radars(Dataset):
         return len(self.list)
 
 if __name__ == '__main__':
-    #filename = np.load('data/pan72_meta.npy')
-    a = Radars(filenames=np.arange(100), fake=True)
-    #a = Radars(filenames=filename, fake=False)
+    filename = np.load('data/pan72_meta.npy')
+    #a = Radars(filenames=np.arange(100), fake=True)
+    a = Radars(filenames=filename, fake=False)
 
     train_loader = DataLoader(a, batch_size=1, shuffle=True, num_workers=4)
     for x in train_loader:
