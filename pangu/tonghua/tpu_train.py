@@ -33,10 +33,8 @@ def training_function(args, config):
     if args.fake == False:
         filenames = np.load(args.filenames)
     
-    dataset = Radars(filenames, fake) 
-    n_val   = int(len(dataset) * 0.1)
-    n_train = len(dataset) - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+    train_ds = Radars(filenames[ : -400], fake) 
+    val_ds = Radars(filenames[-400 : ], fake)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)

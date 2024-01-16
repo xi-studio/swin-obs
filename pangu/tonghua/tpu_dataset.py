@@ -15,7 +15,7 @@ class Radars(Dataset):
 
         self.list = filenames 
         self.fake = fake
-        statis = np.load('data/statis.npz')
+        statis = np.load('data/pangu_statis.npz')
         m = np.ones((241*281, 69)) * statis['mean']
         s = np.ones((241*281, 69)) * statis['std']
         self.mean = (m.T).reshape((69, 241, 281))
