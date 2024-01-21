@@ -59,8 +59,8 @@ class Radars(Dataset):
             sate = sate.astype(np.float16)
             obs  = obs.astype(np.float16)
         else:
-            sate = np.ones((10, 256, 256), dtype=np.float32)
-            obs  = np.ones((69, 256, 256), dtype=np.float32)
+            sate = np.ones((10, 256, 256), dtype=np.float16)
+            obs  = np.ones((69, 256, 256), dtype=np.float16)
 
         return obs, sate
 
@@ -69,10 +69,9 @@ class Radars(Dataset):
 
 if __name__ == '__main__':
     filename = np.load('data/pan_fp16_meta.npy')
-    a = Radars(filenames=filename, fake=False)
+    a = Radars(filenames=filename, fake=True)
 
-    train_loader = DataLoader(a, batch_size=1, shuffle=True, num_workers=4)
+    train_loader = DataLoader(a, batch_size=16, shuffle=True, num_workers=4)
     for x in train_loader:
         print(x[0].shape, x[1].shape)
-        print(x[0].dtype, x[1].dtype)
-        break
+        #print(x[0].dtype, x[1].dtype)
