@@ -10,3 +10,5 @@ python sat_predict.py --cfg configs/unet_sat_to_era5.yaml --batch_size 1 --filen
 python base_train.py --cfg configs/unet_med.yaml --batch_size 1 --filenames ./data/meta/era5_to_sat_train.npy --num_epoch 1 --log_time 0108 --fake True
 
 python tpu_train.py --cfg configs/tpu_unet.yaml --batch_size 1 --filenames ./data/meta/era5_to_sat_train.npy --num_epoch 1 --log_time 0115 --fake True
+
+accelerate launch tpu_train.py --cfg configs/tpu_unet.yaml --batch_size 1 --filenames ./data/pan_fp16_meta.npy --num_epoch 1 --log_time 0121 --fake True

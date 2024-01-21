@@ -15,9 +15,11 @@ class Radars(Dataset):
 
         self.list = filenames 
         self.fake = fake
-        statis = np.load('data/statis.npz')
+        statis = np.load('data/pangu_fp16_statis.npz')
+        std = statis['std']
+        std[std == 0.0] = 1
         m = np.ones((241*281, 69)) * statis['mean']
-        s = np.ones((241*281, 69)) * statis['std']
+        s = np.ones((241*281, 69)) * std 
         self.mean = (m.T).reshape((69, 241, 281))
         self.std  = (s.T).reshape((69, 241, 281))
 
@@ -31,14 +33,14 @@ class Radars(Dataset):
 
     def load_obs(self, filename):
         res = np.load(filename)
-        sur = res['surface']
+        sur = res['sur']
         upp = res['upper']
  
         N, C, W, H = upp.shape
         upp = upp.reshape((N*C, W, H))
 
         obs = np.concatenate((sur, upp), axis=0)
-        obs = (obs - self.mean) / self.std
+        obs = (obs - self.mean) / self.std 
  
         return obs
  
@@ -46,13 +48,16 @@ class Radars(Dataset):
     def __getitem__(self, index):
 
         if self.fake!=True:
-            satename = './data/train/sat_2020/' + self.list[index][0]
-            obsname  = './data/train/era5_obs_2020/' + self.list[index][1]
-            sate = self.load_sat(satename).astype(np.float32)
-            obs  = self.load_obs(obsname).astype(np.float32)
+            obsname  = self.list[index][0]
+            satename = self.list[index][1]
+            sate = self.load_sat(satename)
+            obs  = self.load_obs(obsname)
 
             sate = resize(sate, (10, 256, 256))
             obs  = resize(obs, (69, 256, 256))
+
+            sate = sate.astype(np.float16)
+            obs  = obs.astype(np.float16)
         else:
             sate = np.ones((10, 256, 256), dtype=np.float32)
             obs  = np.ones((69, 256, 256), dtype=np.float32)
@@ -63,10 +68,11 @@ class Radars(Dataset):
         return len(self.list)
 
 if __name__ == '__main__':
-    filename = np.load('data/meta/era5_to_sat_train.npy')
+    filename = np.load('data/pan_fp16_meta.npy')
     a = Radars(filenames=filename, fake=False)
 
     train_loader = DataLoader(a, batch_size=1, shuffle=True, num_workers=4)
     for x in train_loader:
         print(x[0].shape, x[1].shape)
+        print(x[0].dtype, x[1].dtype)
         break
